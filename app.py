@@ -6,6 +6,13 @@ from datetime import datetime
 # --- 1. FUNÇÕES DO BANCO DE DADOS (SQLite) ---
 
 def init_db():
+    def excluir_demanda(id_demanda):
+    """Remove uma demanda do banco de dados pelo ID."""
+    conn = sqlite3.connect('demandas.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM demandas WHERE id = ?', (id_demanda,))
+    conn.commit()
+    conn.close()
     """Cria o arquivo do banco e a tabela se eles não existirem."""
     conn = sqlite3.connect('demandas.db') # Cria o arquivo
     cursor = conn.cursor()
