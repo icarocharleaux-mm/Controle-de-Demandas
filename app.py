@@ -6,13 +6,6 @@ from datetime import datetime
 # --- 1. FUNÇÕES DO BANCO DE DADOS (SQLite) ---
 
 def init_db():
-    def excluir_demanda(id_demanda):
-    """Remove uma demanda do banco de dados pelo ID."""
-    conn = sqlite3.connect('demandas.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM demandas WHERE id = ?', (id_demanda,))
-    conn.commit()
-    conn.close()
     """Cria o arquivo do banco e a tabela se eles não existirem."""
     conn = sqlite3.connect('demandas.db') # Cria o arquivo
     cursor = conn.cursor()
@@ -29,6 +22,14 @@ def init_db():
             status TEXT
         )
     ''')
+    conn.commit()
+    conn.close()
+
+def excluir_demanda(id_demanda):
+    """Remove uma demanda do banco de dados pelo ID."""
+    conn = sqlite3.connect('demandas.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM demandas WHERE id = ?', (id_demanda,))
     conn.commit()
     conn.close()
 
@@ -106,3 +107,22 @@ if not df.empty:
     )
 else:
     st.info("Nenhuma demanda cadastrada ainda. Use o menu lateral para adicionar a primeira!")
+
+# --- SEÇÃO DE GERENCIAMENTO (EXCLUSÃO) ---
+st.divider()
+with st.expander("🛠️ Gerenciar / Excluir Demandas"):
+    if not df.empty:
+        # Criamos uma lista de opções formatada: "ID - Título"
+        opcoes = [f"{row['ID']} - {row['Título']}" for index, row in df.iterrows()]
+        selecionado = st.selectbox("Selecione a demanda para excluir:", opcoes)
+        
+        # Extraímos o ID da string selecionada (o que vem antes do primeiro " - ")
+        id_para_excluir = int(selecionado.split(" - ")[0])
+        
+        if st.button("❌ Confirmar Exclusão", type="primary"):
+            excluir_demanda(id_para_excluir)
+            st.success(f"Demanda {id_para_excluir} removida com sucesso!")
+            # Recarrega a página para atualizar a tabela automaticamente
+            st.rerun()
+    else:
+        st.write("Nenhuma demanda disponível para excluir.")
