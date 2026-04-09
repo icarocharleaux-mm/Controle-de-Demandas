@@ -1,0 +1,15 @@
+[theme]
+# A cor principal (Usada nos botões de destaque, no slider e nos cliques)
+primaryColor = "#00897B"
+
+# A cor de fundo da página principal (Verde água bem clarinho)
+backgroundColor = "#F0F9F8"
+
+# A cor de fundo da barra lateral e caixas de texto (Um tom levemente diferente para destacar)
+secondaryBackgroundColor = "#E0F2F1"
+
+# Cor do texto (Cinza chumbo, melhor para leitura do que o preto puro)
+textColor = "#263238"
+
+# Estilo da fonte
+font = "sans serif"
