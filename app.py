@@ -56,7 +56,7 @@ st.set_page_config(page_title="Gestão de Demandas", page_icon="📊", layout="w
 init_db()
 
 # --- BARRA LATERAL (CADASTRO DE DEMANDAS) ---
-st.sidebar.header("➕ Nova Demanda")
+st.sidebar.header("Adicionar Demanda")
 with st.sidebar.form("form_demanda", clear_on_submit=True):
     titulo = st.text_input("Título da Demanda")
     solicitante = st.text_input("Solicitante (Seu Nome/Setor)")
@@ -75,7 +75,7 @@ with st.sidebar.form("form_demanda", clear_on_submit=True):
         st.sidebar.success("Demanda cadastrada com sucesso!")
 
 # --- ÁREA PRINCIPAL (DASHBOARD) ---
-st.title("📊 Painel de Controle de Demandas (Com Banco de Dados)")
+st.title("📊 Painel de Controle de Demandas")
 
 # Carrega os dados sempre fresquinhos do banco de dados
 df = carregar_demandas()
