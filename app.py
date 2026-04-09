@@ -7,7 +7,7 @@ from datetime import datetime
 
 def init_db():
     """Cria o arquivo do banco e a tabela se eles não existirem."""
-    conn = sqlite3.connect('demandas.db') # Cria o arquivo
+    conn = sqlite3.connect('demandas_v2.db') # Mudei o nome para evitar conflito com o banco antigo
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS demandas (
@@ -15,6 +15,7 @@ def init_db():
             data TEXT,
             titulo TEXT,
             solicitante TEXT,
+            prazo TEXT, 
             g INTEGER,
             u INTEGER,
             t INTEGER,
@@ -27,31 +28,31 @@ def init_db():
 
 def excluir_demanda(id_demanda):
     """Remove uma demanda do banco de dados pelo ID."""
-    conn = sqlite3.connect('demandas.db')
+    conn = sqlite3.connect('demandas_v2.db')
     cursor = conn.cursor()
     cursor.execute('DELETE FROM demandas WHERE id = ?', (id_demanda,))
     conn.commit()
     conn.close()
 
-def inserir_demanda(titulo, solicitante, g, u, t, gut_score):
+def inserir_demanda(titulo, solicitante, prazo, g, u, t, gut_score):
     """Insere uma nova linha na tabela do banco de dados."""
-    conn = sqlite3.connect('demandas.db')
+    conn = sqlite3.connect('demandas_v2.db')
     cursor = conn.cursor()
     data_atual = datetime.now().strftime('%d/%m/%Y')
     
     cursor.execute('''
-        INSERT INTO demandas (data, titulo, solicitante, g, u, t, gut_score, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Backlog')
-    ''', (data_atual, titulo, solicitante, g, u, t, gut_score))
+        INSERT INTO demandas (data, titulo, solicitante, prazo, g, u, t, gut_score, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Backlog')
+    ''', (data_atual, titulo, solicitante, prazo, g, u, t, gut_score))
     
     conn.commit()
     conn.close()
 
 def carregar_demandas():
     """Lê o banco de dados e transforma em um DataFrame do Pandas."""
-    conn = sqlite3.connect('demandas.db')
-    # O Pandas tem uma função mágica que lê o SQL direto para a tabela!
-    query = "SELECT id as ID, data as Data, titulo as Título, solicitante as Solicitante, gut_score as GUT, status as Status FROM demandas"
+    conn = sqlite3.connect('demandas_v2.db')
+    # Adicionamos o prazo na consulta do banco
+    query = "SELECT id as ID, data as Data, titulo as Título, solicitante as Solicitante, prazo as Prazo, gut_score as GUT, status as Status FROM demandas"
     df = pd.read_sql_query(query, conn)
     conn.close()
     return df
@@ -60,14 +61,16 @@ def carregar_demandas():
 
 st.set_page_config(page_title="Gestão de Demandas", page_icon="📊", layout="wide")
 
-# Inicializa o banco de dados (roda toda vez que a página carrega, mas só cria na primeira vez)
 init_db()
 
 # --- BARRA LATERAL (CADASTRO DE DEMANDAS) ---
-st.sidebar.header("Adicionar Demanda")
+st.sidebar.header("➕ Nova Demanda")
 with st.sidebar.form("form_demanda", clear_on_submit=True):
     titulo = st.text_input("Título da Demanda")
     solicitante = st.text_input("Solicitante (Seu Nome/Setor)")
+    
+    # Novo campo: Calendário interativo para o prazo
+    prazo_input = st.date_input("Prazo Acordado")
     
     st.markdown("**Avaliação GUT (1 a 5)**")
     g = st.slider("Gravidade (G)", 1, 5, 3)
@@ -78,14 +81,17 @@ with st.sidebar.form("form_demanda", clear_on_submit=True):
     
     if submit and titulo and solicitante:
         gut_score = g * u * t
-        # Salva direto no banco de dados ao invés da memória
-        inserir_demanda(titulo, solicitante, g, u, t, gut_score)
+        
+        # O Streamlit devolve uma data, nós transformamos em texto (DD/MM/AAAA) para salvar no banco
+        prazo_formatado = prazo_input.strftime('%d/%m/%Y')
+        
+        # Passamos o prazo formatado para a função de salvar
+        inserir_demanda(titulo, solicitante, prazo_formatado, g, u, t, gut_score)
         st.sidebar.success("Demanda cadastrada com sucesso!")
 
 # --- ÁREA PRINCIPAL (DASHBOARD) ---
 st.title("📊 Painel de Controle de Demandas")
 
-# Carrega os dados sempre fresquinhos do banco de dados
 df = carregar_demandas()
 
 # 3. Métricas Rápidas
@@ -112,17 +118,14 @@ else:
 st.divider()
 with st.expander("🛠️ Gerenciar / Excluir Demandas"):
     if not df.empty:
-        # Criamos uma lista de opções formatada: "ID - Título"
         opcoes = [f"{row['ID']} - {row['Título']}" for index, row in df.iterrows()]
         selecionado = st.selectbox("Selecione a demanda para excluir:", opcoes)
         
-        # Extraímos o ID da string selecionada (o que vem antes do primeiro " - ")
         id_para_excluir = int(selecionado.split(" - ")[0])
         
         if st.button("❌ Confirmar Exclusão", type="primary"):
             excluir_demanda(id_para_excluir)
             st.success(f"Demanda {id_para_excluir} removida com sucesso!")
-            # Recarrega a página para atualizar a tabela automaticamente
             st.rerun()
     else:
         st.write("Nenhuma demanda disponível para excluir.")
