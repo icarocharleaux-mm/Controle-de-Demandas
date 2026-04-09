@@ -1,16 +1,59 @@
 import streamlit as st
 import pandas as pd
+import sqlite3
 from datetime import datetime
 
-# 1. Configuração da página
+# --- 1. FUNÇÕES DO BANCO DE DADOS (SQLite) ---
+
+def init_db():
+    """Cria o arquivo do banco e a tabela se eles não existirem."""
+    conn = sqlite3.connect('demandas.db') # Cria o arquivo
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS demandas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT,
+            titulo TEXT,
+            solicitante TEXT,
+            g INTEGER,
+            u INTEGER,
+            t INTEGER,
+            gut_score INTEGER,
+            status TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def inserir_demanda(titulo, solicitante, g, u, t, gut_score):
+    """Insere uma nova linha na tabela do banco de dados."""
+    conn = sqlite3.connect('demandas.db')
+    cursor = conn.cursor()
+    data_atual = datetime.now().strftime('%d/%m/%Y')
+    
+    cursor.execute('''
+        INSERT INTO demandas (data, titulo, solicitante, g, u, t, gut_score, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Backlog')
+    ''', (data_atual, titulo, solicitante, g, u, t, gut_score))
+    
+    conn.commit()
+    conn.close()
+
+def carregar_demandas():
+    """Lê o banco de dados e transforma em um DataFrame do Pandas."""
+    conn = sqlite3.connect('demandas.db')
+    # O Pandas tem uma função mágica que lê o SQL direto para a tabela!
+    query = "SELECT id as ID, data as Data, titulo as Título, solicitante as Solicitante, gut_score as GUT, status as Status FROM demandas"
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+# --- 2. CONFIGURAÇÃO DA INTERFACE (STREAMLIT) ---
+
 st.set_page_config(page_title="Gestão de Demandas", page_icon="📊", layout="wide")
 
-# 2. Inicializando o 'banco de dados' na memória do Streamlit
-# O session_state garante que os dados não sumam ao clicar em um botão
-if 'demandas' not in st.session_state:
-    st.session_state['demandas'] = pd.DataFrame(
-        columns=['ID', 'Data', 'Título', 'Solicitante', 'GUT', 'Status']
-    )
+# Inicializa o banco de dados (roda toda vez que a página carrega, mas só cria na primeira vez)
+init_db()
 
 # --- BARRA LATERAL (CADASTRO DE DEMANDAS) ---
 st.sidebar.header("➕ Nova Demanda")
@@ -19,33 +62,23 @@ with st.sidebar.form("form_demanda", clear_on_submit=True):
     solicitante = st.text_input("Solicitante (Seu Nome/Setor)")
     
     st.markdown("**Avaliação GUT (1 a 5)**")
-    g = st.slider("Gravidade (G)", 1, 5, 3, help="Qual o impacto se não for feito?")
-    u = st.slider("Urgência (U)", 1, 5, 3, help="Qual o tempo disponível para fazer?")
-    t = st.slider("Tendência (T)", 1, 5, 3, help="Qual o potencial de piorar com o tempo?")
+    g = st.slider("Gravidade (G)", 1, 5, 3)
+    u = st.slider("Urgência (U)", 1, 5, 3)
+    t = st.slider("Tendência (T)", 1, 5, 3)
     
     submit = st.form_submit_button("Cadastrar Demanda")
     
     if submit and titulo and solicitante:
-        novo_id = len(st.session_state['demandas']) + 1
         gut_score = g * u * t
-        
-        nova_linha = pd.DataFrame([{
-            'ID': novo_id,
-            'Data': datetime.now().strftime('%d/%m/%Y'),
-            'Título': titulo,
-            'Solicitante': solicitante,
-            'GUT': gut_score,
-            'Status': 'Backlog'
-        }])
-        
-        # Adiciona a nova demanda ao DataFrame
-        st.session_state['demandas'] = pd.concat([st.session_state['demandas'], nova_linha], ignore_index=True)
+        # Salva direto no banco de dados ao invés da memória
+        inserir_demanda(titulo, solicitante, g, u, t, gut_score)
         st.sidebar.success("Demanda cadastrada com sucesso!")
 
 # --- ÁREA PRINCIPAL (DASHBOARD) ---
-st.title("📊 Painel de Controle de Demandas")
+st.title("📊 Painel de Controle de Demandas (Com Banco de Dados)")
 
-df = st.session_state['demandas']
+# Carrega os dados sempre fresquinhos do banco de dados
+df = carregar_demandas()
 
 # 3. Métricas Rápidas
 col1, col2, col3 = st.columns(3)
@@ -58,10 +91,7 @@ st.divider()
 # 4. Tabela de Demandas Ordenada por Prioridade
 st.subheader("📋 Fila de Prioridades (Ordenado pelo Score GUT)")
 if not df.empty:
-    # Ordena do maior GUT para o menor
     df_ordenado = df.sort_values(by='GUT', ascending=False).reset_index(drop=True)
-    
-    # Exibe a tabela e destaca visualmente a coluna GUT (quanto mais vermelho, mais crítico)
     st.dataframe(
         df_ordenado.style.background_gradient(subset=['GUT'], cmap='Reds'),
         use_container_width=True,
